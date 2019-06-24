@@ -1,0 +1,14 @@
+.vs/
+[Bb]in/
+[Oo]bj/
+packages/
+artifacts/
+testresults/
+
+tempkey.rsa
+
+# build tools used by Cake
+tools/*
+build.cake
+build.ps1
+*.user

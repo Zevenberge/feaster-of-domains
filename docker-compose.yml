@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+
+
+  sql.data:
+    image: "microsoft/mssql-server-linux:2017-GA"
+    environment:
+        SA_PASSWORD: "268705b8-bba5-4c58-93d2-7da19c98590f"
+        ACCEPT_EULA: "Y"    
+    volumes:
+      - /c/temp/amtrust/containers/identityserver/mssql:/var/opt/mssql
+    ports:
+      - 11433:1433

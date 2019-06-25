@@ -1,0 +1,40 @@
+@model FeasterOfDomains.Users.Web.Models.LoginViewModel
+
+<div class="login-page">
+    <div class="page-header">
+        <h1>Login</h1>
+    </div>
+
+    @Html.Partial("_ValidationSummary")
+
+    <div class="row">
+        <div class="col-sm-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Feaster of Domains Authentication</h3>
+                </div>
+                <div class="panel-body">
+                    <form asp-route="Account/Login" method="post">
+                    <div asp-validation-summary="All" class="text-danger"></div>
+                     <fieldset>
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="ReturnUrl" />
+                       
+                            <div class="form-group">
+                                <label asp-for="Username"></label>
+                                <input class="form-control" placeholder="Username" asp-for="Username" autofocus>
+                            </div>
+                            <div class="form-group">
+                                <label asp-for="Password"></label>
+                                <input type="password" class="form-control" placeholder="Password" asp-for="Password" autocomplete="off">
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary" name="button" value="login">Login</button>
+                            </div>
+                        </fieldset>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,4 +1,7 @@
-﻿namespace FeasterOfDomains.Users.Web
+﻿using System.Collections.Generic;
+//using IdentityServer4.Models;
+
+namespace FeasterOfDomains.Users.Web
 {
     public static class AccountOptions
     {
@@ -16,5 +19,22 @@
         public static string WindowsAuthenticationSchemeName { get; set; }
 
         public const string InvalidCredentialsErrorMessage = "Unknown username or password";
+
+        /*public static IEnumerable<Client> Clients 
+        {
+            get
+            {
+                yield return new Client
+                {
+                    ClientId = "client",
+                    AllowedGrantTypes = GrantTypes.ResourceOwnerPassword,
+                    ClientSecrets =
+                    {
+                        new Secret("secret".Sha256())
+                    },
+                    AllowedScopes = { "feaster-of-domains" }
+                };
+            }
+        }*/
     }
 }

@@ -1,19 +1,21 @@
 using FeasterOfDomains.Users.Infrastructure;
 using FeasterOfDomains.Users.Web.Models;
 using IdentityModel;
-using IdentityServer4;
+/* using IdentityServer4;
 using IdentityServer4.Events;
 using IdentityServer4.Extensions;
 using IdentityServer4.Models;
 using IdentityServer4.Services;
 using IdentityServer4.Stores;
-using IdentityServer4.Test;
+using IdentityServer4.Test;*/
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeasterOfDomains.Users.Web.Controllers
@@ -26,24 +28,32 @@ namespace FeasterOfDomains.Users.Web.Controllers
     [AllowAnonymous]
     public class AccountController : Controller
     {
-        private readonly TestUserStore _users;
-        private readonly IIdentityServerInteractionService _interaction;
-        private readonly IClientStore _clientStore;
+        private readonly UserManager<FeasterUser> _users;
+        //private readonly IIdentityServerInteractionService _interaction;
+        //private readonly IClientStore _clientStore;
         private readonly IAuthenticationSchemeProvider _schemeProvider;
-        private readonly IEventService _events;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ILogger<AccountController> _logger;
+
+        //private readonly IEventService _events;
 
         public AccountController(
-            IIdentityServerInteractionService interaction,
-            IClientStore clientStore,
+            //IIdentityServerInteractionService interaction,
+            //IClientStore clientStore,
             IAuthenticationSchemeProvider schemeProvider,
-            IEventService events,
-            IUserStore<FeasterUser> users)
+            IHttpContextAccessor httpContextAccessor,
+            //IEventService events,
+            UserManager<FeasterUser> users,
+            ILogger<AccountController> logger)
         {
-
-            _interaction = interaction;
-            _clientStore = clientStore;
+            logger.LogInformation("Creating account controller");
+            //_interaction = interaction;
+            //_clientStore = clientStore;
             _schemeProvider = schemeProvider;
-            _events = events;
+            _httpContextAccessor = httpContextAccessor;
+            //_events = events;
+            _users = users;
+            _logger = logger;
         }
 
         /// <summary>
@@ -52,6 +62,7 @@ namespace FeasterOfDomains.Users.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Login(string returnUrl)
         {
+            _logger.LogInformation("Retrieving log in screen");
             // build a model so we know what to show on the login page
             var vm = await BuildLoginViewModelAsync(returnUrl);
             return View(vm);
@@ -62,74 +73,40 @@ namespace FeasterOfDomains.Users.Web.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(LoginInputModel model, string button)
+        public async Task<IActionResult> Login(LoginInputModel model, string button, CancellationToken token = default(CancellationToken))
         {
+            _logger.LogInformation("Trying to log in for user " + model.Username);
             // check if we are in the context of an authorization request
-            var context = await _interaction.GetAuthorizationContextAsync(model.ReturnUrl);
-
-            // the user clicked the "cancel" button
-            if (button != "login")
-            {
-                if (context != null)
-                {
-                    // if the user cancels, send a result back into IdentityServer as if they 
-                    // denied the consent (even if this client does not require consent).
-                    // this will send back an access denied OIDC error response to the client.
-                    await _interaction.GrantConsentAsync(context, ConsentResponse.Denied);
-
-                    /*
-                    // we can trust model.ReturnUrl since GetAuthorizationContextAsync returned non-null
-                    if (await _clientStore.IsPkceClientAsync(context.ClientId))
-                    {
-                        // if the client is PKCE then we assume it's native, so this change in how to
-                        // return the response is for better UX for the end user.
-                        return View("Redirect", new RedirectViewModel { RedirectUrl = model.ReturnUrl });
-                    }*/
-
-                    return Redirect(model.ReturnUrl);
-                }
-                else
-                {
-                    // since we don't have a valid context, then we just go back to the home page
-                    return Redirect("~/");
-                }
-            }
+            //var context = await _interaction.GetAuthorizationContextAsync(model.ReturnUrl);
 
             if (ModelState.IsValid)
             {
+                _logger.LogDebug("The model is valid");
                 // validate username/password against in-memory store
-                if (_users.ValidateCredentials(model.Username, model.Password))
+                var user = await _users.FindByNameAsync(model.Username);
+                if (await _users.CheckPasswordAsync(user, model.Password))
                 {
-                    var user = _users.FindByUsername(model.Username);
-                    await _events.RaiseAsync(new UserLoginSuccessEvent(user.Username, user.SubjectId, user.Username));
+                    _logger.LogDebug("The password is valid");
+                    //await _events.RaiseAsync(new UserLoginSuccessEvent(user.UserName, user.Id, user.UserName));
 
                     // only set explicit expiration here if user chooses "remember me". 
                     // otherwise we rely upon expiration configured in cookie middleware.
                     AuthenticationProperties props = null;
 
                     // issue authentication cookie with subject ID and username
-                    await HttpContext.SignInAsync(user.SubjectId, user.Username, props);
+                    await _httpContextAccessor.HttpContext.SignInAsync(user.Id, user.UserName, props);
 
-                    if (context != null)
-                    {/* 
-                        if (await _clientStore.IsPkceClientAsync(context.ClientId))
-                        {
-                            // if the client is PKCE then we assume it's native, so this change in how to
-                            // return the response is for better UX for the end user.
-                            return View("Redirect", new RedirectViewModel { RedirectUrl = model.ReturnUrl });
-                        }*/
-
-                        // we can trust model.ReturnUrl since GetAuthorizationContextAsync returned non-null
-                        return Redirect(model.ReturnUrl);
-                    }
+                    
 
                     // request for a local page
                     if (Url.IsLocalUrl(model.ReturnUrl))
                     {
+                        _logger.LogInformation("Log in succeeded, going to " + model.ReturnUrl);
                         return Redirect(model.ReturnUrl);
                     }
                     else if (string.IsNullOrEmpty(model.ReturnUrl))
                     {
+                        _logger.LogInformation("Log in succeeded. Going home.");
                         return Redirect("~/");
                     }
                     else
@@ -138,13 +115,15 @@ namespace FeasterOfDomains.Users.Web.Controllers
                         throw new Exception("invalid return URL");
                     }
                 }
-
-                await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "invalid credentials"));
+                _logger.LogDebug("Log in failed");
+                //await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "invalid credentials"));
                 ModelState.AddModelError(string.Empty, AccountOptions.InvalidCredentialsErrorMessage);
+                if(ModelState.IsValid) throw new Exception("MS PLS");
             }
-
+            _logger.LogInformation("Log in failed. Trying again.");
             // something went wrong, show form with error
             var vm = await BuildLoginViewModelAsync(model);
+            vm.Username = AccountOptions.InvalidCredentialsErrorMessage;
             return View(vm);
         }
 
@@ -181,10 +160,10 @@ namespace FeasterOfDomains.Users.Web.Controllers
             if (User?.Identity.IsAuthenticated == true)
             {
                 // delete local authentication cookie
-                await HttpContext.SignOutAsync();
+                await _httpContextAccessor.HttpContext.SignOutAsync();
 
                 // raise the logout event
-                await _events.RaiseAsync(new UserLogoutSuccessEvent(User.GetSubjectId(), User.GetDisplayName()));
+                //await _events.RaiseAsync(new UserLogoutSuccessEvent(User.GetSubjectId(), User.GetDisplayName()));
             }
 
             // check if we need to trigger sign-out at an upstream identity provider
@@ -209,10 +188,10 @@ namespace FeasterOfDomains.Users.Web.Controllers
         /*****************************************/
         private async Task<LoginViewModel> BuildLoginViewModelAsync(string returnUrl)
         {
-            var context = await _interaction.GetAuthorizationContextAsync(returnUrl);
-            if (context?.IdP != null)
+            //var context = await _interaction.GetAuthorizationContextAsync(returnUrl);
+            /* if (context?.IdP != null)
             {
-                var local = context.IdP == IdentityServerConstants.LocalIdentityProvider;
+                //var local = context.IdP == IdentityServerConstants.LocalIdentityProvider;
 
                 // this is meant to short circuit the UI and only trigger the one external IdP
                 var vm = new LoginViewModel
@@ -222,24 +201,14 @@ namespace FeasterOfDomains.Users.Web.Controllers
                 };
 
                 return vm;
-            }
+            }*/
 
             var schemes = await _schemeProvider.GetAllSchemesAsync();
-
-            var allowLocal = true;
-            if (context?.ClientId != null)
-            {
-                var client = await _clientStore.FindEnabledClientByIdAsync(context.ClientId);
-                if (client != null)
-                {
-                    allowLocal = client.EnableLocalLogin;
-                }
-            }
 
             return new LoginViewModel
             {
                 ReturnUrl = returnUrl,
-                Username = context?.LoginHint
+                //Username = context?.LoginHint
             };
         }
 
@@ -261,13 +230,13 @@ namespace FeasterOfDomains.Users.Web.Controllers
                 return vm;
             }
 
-            var context = await _interaction.GetLogoutContextAsync(logoutId);
+            /* var context = await _interaction.GetLogoutContextAsync(logoutId);
             if (context?.ShowSignoutPrompt == false)
             {
                 // it's safe to automatically sign-out
                 vm.ShowLogoutPrompt = false;
                 return vm;
-            }
+            }*/
 
             // show the logout prompt. this prevents attacks where the user
             // is automatically signed out by another malicious web page.
@@ -277,20 +246,20 @@ namespace FeasterOfDomains.Users.Web.Controllers
         private async Task<LoggedOutViewModel> BuildLoggedOutViewModelAsync(string logoutId)
         {
             // get context information (client name, post logout redirect URI and iframe for federated signout)
-            var logout = await _interaction.GetLogoutContextAsync(logoutId);
+            //var logout = await _interaction.GetLogoutContextAsync(logoutId);
 
             var vm = new LoggedOutViewModel
             {
                 AutomaticRedirectAfterSignOut = AccountOptions.AutomaticRedirectAfterSignOut,
-                PostLogoutRedirectUri = logout?.PostLogoutRedirectUri,
-                ClientName = string.IsNullOrEmpty(logout?.ClientName) ? logout?.ClientId : logout?.ClientName,
-                SignOutIframeUrl = logout?.SignOutIFrameUrl,
+            //    PostLogoutRedirectUri = logout?.PostLogoutRedirectUri,
+            //    ClientName = string.IsNullOrEmpty(logout?.ClientName) ? logout?.ClientId : logout?.ClientName,
+            //    SignOutIframeUrl = logout?.SignOutIFrameUrl,
                 LogoutId = logoutId
             };
 
             if (User?.Identity.IsAuthenticated == true)
             {
-                var idp = User.FindFirst(JwtClaimTypes.IdentityProvider)?.Value;
+                /*var idp = User.FindFirst(JwtClaimTypes.IdentityProvider)?.Value;
                 if (idp != null && idp != IdentityServer4.IdentityServerConstants.LocalIdentityProvider)
                 {
                     var providerSupportsSignout = await HttpContext.GetSchemeSupportsSignOutAsync(idp);
@@ -306,7 +275,7 @@ namespace FeasterOfDomains.Users.Web.Controllers
 
                         vm.ExternalAuthenticationScheme = idp;
                     }
-                }
+                }*/
             }
 
             return vm;

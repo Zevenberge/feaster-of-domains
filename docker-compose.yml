@@ -1,7 +1,17 @@
 version: '3'
 
 services:
-
+  feaster.of.domains.users:
+    image: feaster.of.domain.users
+    build:
+      context: ./FeasterOfDomains.Users
+      dockerfile: Dockerfile
+    depends_on:
+      - sql.data
+    environment:     
+      ConnectionString: "Server=sql.data;Database=IdentityServer;User=sa;Password=268705b8-bba5-4c58-93d2-7da19c98590f;"
+    ports:
+      - 10000:80
 
   sql.data:
     image: "microsoft/mssql-server-linux:2017-GA"

@@ -1,6 +1,7 @@
 .vs/
 [Bb]in/
 [Oo]bj/
+[Oo]ut/
 packages/
 artifacts/
 testresults/
@@ -12,3 +13,5 @@ tools/*
 build.cake
 build.ps1
 *.user
+
+*.tar

@@ -9,7 +9,7 @@ services:
     depends_on:
       - sql.data
     environment:     
-      ConnectionString: "Server=sql.data;Database=IdentityServer;User=sa;Password=268705b8-bba5-4c58-93d2-7da19c98590f;"
+      ConnectionString: "Server=sql.data;Database=Users;User=sa;Password=268705b8-bba5-4c58-93d2-7da19c98590f;"
     ports:
       - 10000:80
 
@@ -21,4 +21,4 @@ services:
     volumes:
       - /c/temp/amtrust/containers/identityserver/mssql:/var/opt/mssql
     ports:
-      - 11433:1433
+      - 1433:1433

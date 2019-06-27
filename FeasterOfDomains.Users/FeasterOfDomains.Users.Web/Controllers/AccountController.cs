@@ -73,7 +73,7 @@ namespace FeasterOfDomains.Users.Web.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(LoginInputModel model, string button, CancellationToken token = default(CancellationToken))
+        public async Task<IActionResult> Login(LoginInputModel model, CancellationToken token = default(CancellationToken))
         {
             _logger.LogInformation("Trying to log in for user " + model.Username);
             // check if we are in the context of an authorization request
